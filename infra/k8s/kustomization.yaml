@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - base/00-namespace.yaml
+  - base/10-rbac.yaml
+  - base/20-kafka.yaml
+  - base/30-postgres.yaml
+  - base/40-airflow.yaml
+  - base/50-trino.yaml
+  - base/60-superset.yaml
+  - base/70-producer.yaml
+  - base/80-autoscaler-cronjob.yaml

@@ -1,0 +1,54 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: criteo-health-check
+  namespace: criteo-lakehouse
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: criteo-spark:local
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: local:///opt/project/code/pipelines/health_check.py
+  sparkVersion: 3.5.5
+  restartPolicy:
+    type: Never
+  driver:
+    serviceAccount: spark
+    cores: 1
+    memory: 1024m
+    env:
+      - name: AWS_PROFILE
+        value: iceberg-lab
+      - name: AWS_REGION
+        value: ap-northeast-2
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /home/spark/.aws/credentials
+      - name: AWS_CONFIG_FILE
+        value: /home/spark/.aws/config
+    volumeMounts:
+      - name: aws-credentials
+        mountPath: /home/spark/.aws
+        readOnly: true
+  executor:
+    instances: 1
+    cores: 1
+    memory: 1024m
+    env:
+      - name: AWS_PROFILE
+        value: iceberg-lab
+      - name: AWS_REGION
+        value: ap-northeast-2
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /home/spark/.aws/credentials
+      - name: AWS_CONFIG_FILE
+        value: /home/spark/.aws/config
+    volumeMounts:
+      - name: aws-credentials
+        mountPath: /home/spark/.aws
+        readOnly: true
+  volumes:
+    - name: aws-credentials
+      secret:
+        secretName: aws-credentials
+        optional: true

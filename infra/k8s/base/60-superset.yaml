@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: superset-secret
+  namespace: criteo-lakehouse
+type: Opaque
+stringData:
+  secret-key: "local-dev-superset-secret"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset
+  namespace: criteo-lakehouse
+spec:
+  selector:
+    app: superset
+  ports:
+    - name: http
+      port: 8088
+      targetPort: 8088
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superset
+  namespace: criteo-lakehouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: superset
+  template:
+    metadata:
+      labels:
+        app: superset
+    spec:
+      initContainers:
+        - name: init
+          image: criteo-superset:local
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-lc"]
+          args:
+            - superset db upgrade && superset fab create-admin --username admin --firstname Data --lastname Engineer --email admin@example.com --password admin || true && superset init
+          env:
+            - name: SUPERSET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: superset-secret
+                  key: secret-key
+          volumeMounts:
+            - name: superset-home
+              mountPath: /app/superset_home
+      containers:
+        - name: superset
+          image: criteo-superset:local
+          imagePullPolicy: IfNotPresent
+          command: ["gunicorn"]
+          args: ["--bind", "0.0.0.0:8088", "--workers", "2", "--timeout", "120", "superset.app:create_app()"]
+          ports:
+            - containerPort: 8088
+          env:
+            - name: SUPERSET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: superset-secret
+                  key: secret-key
+          volumeMounts:
+            - name: superset-home
+              mountPath: /app/superset_home
+      volumes:
+        - name: superset-home
+          persistentVolumeClaim:
+            claimName: superset-home
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: superset-home
+  namespace: criteo-lakehouse
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi

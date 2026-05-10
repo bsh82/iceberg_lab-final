@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: airflow-secret
+  namespace: criteo-lakehouse
+type: Opaque
+stringData:
+  fernet-key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  webserver-secret-key: "local-dev-webserver-secret"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver
+  namespace: criteo-lakehouse
+spec:
+  selector:
+    app: airflow-webserver
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-webserver
+  namespace: criteo-lakehouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-webserver
+  template:
+    metadata:
+      labels:
+        app: airflow-webserver
+    spec:
+      serviceAccountName: airflow
+      initContainers:
+        - name: db-migrate
+          image: criteo-airflow:local
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-lc"]
+          args:
+            - |
+              for i in {1..60}; do
+                airflow db check && break
+                echo "waiting for Airflow metadata database ($i/60)"
+                sleep 5
+              done
+              airflow db migrate
+              airflow users create --username admin --password admin --firstname Data --lastname Engineer --role Admin --email admin@example.com || true
+          envFrom:
+            - configMapRef:
+                name: airflow-env
+          env:
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: fernet-key
+      containers:
+        - name: webserver
+          image: criteo-airflow:local
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-lc"]
+          args:
+            - |
+              for i in {1..60}; do
+                airflow db check && break
+                echo "waiting for Airflow metadata database ($i/60)"
+                sleep 5
+              done
+              exec airflow webserver
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: airflow-env
+          env:
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: fernet-key
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: webserver-secret-key
+          volumeMounts:
+            - name: aws-credentials
+              mountPath: /opt/airflow/.aws
+              readOnly: true
+      volumes:
+        - name: aws-credentials
+          secret:
+            secretName: aws-credentials
+            optional: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-scheduler
+  namespace: criteo-lakehouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-scheduler
+  template:
+    metadata:
+      labels:
+        app: airflow-scheduler
+    spec:
+      serviceAccountName: airflow
+      containers:
+        - name: scheduler
+          image: criteo-airflow:local
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-lc"]
+          args:
+            - |
+              for i in {1..60}; do
+                airflow db check && break
+                echo "waiting for Airflow metadata database ($i/60)"
+                sleep 5
+              done
+              exec airflow scheduler
+          envFrom:
+            - configMapRef:
+                name: airflow-env
+          env:
+            - name: AIRFLOW__CORE__FERNET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: fernet-key
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: webserver-secret-key
+          volumeMounts:
+            - name: aws-credentials
+              mountPath: /opt/airflow/.aws
+              readOnly: true
+      volumes:
+        - name: aws-credentials
+          secret:
+            secretName: aws-credentials
+            optional: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-env
+  namespace: criteo-lakehouse
+data:
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres.criteo-lakehouse.svc.cluster.local:5432/airflow
+  AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+  AIRFLOW__CORE__HOSTNAME_CALLABLE: airflow.utils.net.get_host_ip_address
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+  AWS_PROFILE: iceberg-lab
+  AWS_REGION: ap-northeast-2
+  AWS_SHARED_CREDENTIALS_FILE: /opt/airflow/.aws/credentials
+  AWS_CONFIG_FILE: /opt/airflow/.aws/config
+  K8S_NAMESPACE: criteo-lakehouse

@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: spark-streaming-autoscaler
+  namespace: criteo-lakehouse
+spec:
+  suspend: true
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: spark
+          restartPolicy: OnFailure
+          containers:
+            - name: autoscaler
+              image: criteo-spark:local
+              imagePullPolicy: IfNotPresent
+              command: ["python3", "-m", "code.pipelines.autoscale_streaming"]
+              env:
+                - name: AWS_PROFILE
+                  value: iceberg-lab
+                - name: AWS_REGION
+                  value: ap-northeast-2
+                - name: AWS_SHARED_CREDENTIALS_FILE
+                  value: /home/spark/.aws/credentials
+                - name: AWS_CONFIG_FILE
+                  value: /home/spark/.aws/config
+                - name: KAFKA_BOOTSTRAP_SERVERS
+                  value: kafka.criteo-lakehouse.svc.cluster.local:9092
+                - name: KAFKA_TOPIC
+                  value: criteo-attribution-events
+                - name: K8S_NAMESPACE
+                  value: criteo-lakehouse
+              volumeMounts:
+                - name: aws-credentials
+                  mountPath: /home/spark/.aws
+                  readOnly: true
+          volumes:
+            - name: aws-credentials
+              secret:
+                secretName: aws-credentials
+                optional: true

@@ -1,0 +1,97 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: criteo-bronze-to-silver
+  namespace: criteo-lakehouse
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: criteo-spark:local
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: local:///opt/project/code/pipelines/bronze_to_silver.py
+  sparkVersion: 3.5.5
+  restartPolicy:
+    type: Always
+    onFailureRetries: 10
+    onFailureRetryInterval: 30
+  dynamicAllocation:
+    enabled: true
+    initialExecutors: 1
+    minExecutors: 1
+    maxExecutors: 1
+  sparkConf:
+    spark.dynamicAllocation.shuffleTracking.enabled: "true"
+    spark.kubernetes.allocation.batch.size: "1"
+    spark.executor.cores: "1"
+    spark.executor.memory: "768m"
+    spark.executor.memoryOverhead: "384m"
+    spark.driver.memory: "768m"
+    spark.driver.memoryOverhead: "384m"
+    spark.sql.shuffle.partitions: "8"
+    spark.sql.streaming.metricsEnabled: "true"
+  driver:
+    serviceAccount: spark
+    labels:
+      app: criteo-bronze-to-silver
+    env:
+      - name: AWS_PROFILE
+        value: iceberg-lab
+      - name: AWS_REGION
+        value: ap-northeast-2
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /home/spark/.aws/credentials
+      - name: AWS_CONFIG_FILE
+        value: /home/spark/.aws/config
+      - name: BRONZE_PATH
+        value: s3a://metacode-iceberg-lakehouse/bronze/criteo_attribution_events
+      - name: CHECKPOINT_PATH
+        value: s3a://metacode-iceberg-lakehouse/checkpoints
+      - name: SPARK_SQL_SHUFFLE_PARTITIONS
+        value: "8"
+    volumeMounts:
+      - name: aws-credentials
+        mountPath: /home/spark/.aws
+        readOnly: true
+      - name: code-overrides
+        mountPath: /opt/project/code/common/spark.py
+        subPath: spark.py
+      - name: code-overrides
+        mountPath: /opt/project/code/pipelines/bronze_to_silver.py
+        subPath: bronze_to_silver.py
+  executor:
+    labels:
+      app: criteo-bronze-to-silver
+    env:
+      - name: AWS_PROFILE
+        value: iceberg-lab
+      - name: AWS_REGION
+        value: ap-northeast-2
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /home/spark/.aws/credentials
+      - name: AWS_CONFIG_FILE
+        value: /home/spark/.aws/config
+      - name: BRONZE_PATH
+        value: s3a://metacode-iceberg-lakehouse/bronze/criteo_attribution_events
+      - name: CHECKPOINT_PATH
+        value: s3a://metacode-iceberg-lakehouse/checkpoints
+      - name: SPARK_SQL_SHUFFLE_PARTITIONS
+        value: "8"
+    volumeMounts:
+      - name: aws-credentials
+        mountPath: /home/spark/.aws
+        readOnly: true
+      - name: code-overrides
+        mountPath: /opt/project/code/common/spark.py
+        subPath: spark.py
+      - name: code-overrides
+        mountPath: /opt/project/code/pipelines/bronze_to_silver.py
+        subPath: bronze_to_silver.py
+  volumes:
+    - name: aws-credentials
+      secret:
+        secretName: aws-credentials
+        optional: true
+    - name: code-overrides
+      configMap:
+        name: criteo-code-overrides

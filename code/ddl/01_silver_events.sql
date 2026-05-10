@@ -1,0 +1,47 @@
+CREATE TABLE IF NOT EXISTS ${catalog}.${silver_db}.events (
+  event_id STRING NOT NULL,
+  event_time TIMESTAMP NOT NULL,
+  event_date DATE NOT NULL,
+  event_hour INT NOT NULL,
+  source_timestamp BIGINT,
+  user_id BIGINT,
+  campaign_id BIGINT,
+  conversion INT,
+  conversion_timestamp BIGINT,
+  conversion_id BIGINT,
+  attribution INT,
+  click INT,
+  click_pos INT,
+  click_nb INT,
+  cost DOUBLE,
+  cpo DOUBLE,
+  time_since_last_click BIGINT,
+  cat1 BIGINT,
+  cat2 BIGINT,
+  cat3 BIGINT,
+  cat4 BIGINT,
+  cat5 BIGINT,
+  cat6 BIGINT,
+  cat7 BIGINT,
+  cat8 BIGINT,
+  cat9 BIGINT,
+  producer_ingest_ts TIMESTAMP,
+  bronze_ingest_ts TIMESTAMP,
+  silver_ingest_ts TIMESTAMP,
+  kafka_topic STRING,
+  kafka_partition BIGINT,
+  kafka_offset BIGINT,
+  payload_hash STRING
+)
+USING iceberg
+PARTITIONED BY (days(event_time), bucket(64, campaign_id))
+TBLPROPERTIES (
+  'format-version' = '2',
+  'write.distribution-mode' = 'hash',
+  'write.target-file-size-bytes' = '134217728',
+  'write.parquet.compression-codec' = 'zstd',
+  'write.metadata.delete-after-commit.enabled' = 'true',
+  'write.metadata.previous-versions-max' = '20',
+  'history.expire.min-snapshots-to-keep' = '24',
+  'history.expire.max-snapshot-age-ms' = '604800000'
+);

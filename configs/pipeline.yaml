@@ -1,0 +1,41 @@
+aws:
+  profile: iceberg-lab
+  region: ap-northeast-2
+  bucket: metacode-iceberg-lakehouse
+
+lakehouse:
+  catalog: lakehouse
+  warehouse: s3://metacode-iceberg-lakehouse/warehouse
+  bronze_path: s3a://metacode-iceberg-lakehouse/bronze/criteo_attribution_events
+  checkpoint_path: s3a://metacode-iceberg-lakehouse/checkpoints
+  silver_db: ad_attribution_silver
+  gold_db: ad_attribution_gold
+  ops_db: ad_attribution_ops
+
+kafka:
+  bootstrap_servers: kafka.criteo-lakehouse.svc.cluster.local:9092
+  topic: criteo-attribution-events
+  producer_client_id: criteo-replay-producer
+  bronze_consumer_group: bronze-writer
+  silver_consumer_group: silver-writer
+
+streaming:
+  bronze_trigger: "30 seconds"
+  silver_trigger: "30 seconds"
+  watermark: "2 hours"
+  max_offsets_per_trigger: 50000
+
+maintenance:
+  compact_target_file_size_bytes: 134217728
+  compact_recent_days: 3
+  expire_snapshot_retention_days: 7
+  expire_retain_last: 24
+  orphan_retention_days: 3
+
+autoscaling:
+  min_executors: 1
+  max_executors: 8
+  scale_up_lag_threshold: 200000
+  scale_down_lag_threshold: 20000
+  scale_up_batch_duration_ms: 120000
+  scale_down_batch_duration_ms: 30000

@@ -1,0 +1,36 @@
+dashboard_title: Criteo Attribution Lakehouse
+database:
+  sqlalchemy_uri: trino://admin@trino.criteo-lakehouse.svc.cluster.local:8080/iceberg
+datasets:
+  - name: business_campaign_daily
+    sql: dashboard/sql/business_campaign_daily.sql
+    charts:
+      - name: Spend by Campaign
+        type: table_or_bar
+        metrics: [spend, clicks, conversions, attributed_conversions]
+        dimensions: [event_date, campaign_id]
+      - name: Cost per Attributed Conversion
+        type: line
+        metrics: [cost_per_attributed_conversion]
+        dimensions: [event_date, campaign_id]
+  - name: business_campaign_hourly
+    sql: dashboard/sql/business_campaign_hourly.sql
+    charts:
+      - name: Hourly Conversion Rate
+        type: line
+        metrics: [conversion_rate]
+        dimensions: [event_date, event_hour, campaign_id]
+  - name: operations_health_latest
+    sql: dashboard/sql/operations_health_latest.sql
+    charts:
+      - name: Pipeline Health Status
+        type: table
+        metrics: [metric_value]
+        dimensions: [metric_name, severity, details, run_ts]
+  - name: operations_streaming_batches
+    sql: dashboard/sql/operations_streaming_batches.sql
+    charts:
+      - name: Streaming Batch Duration
+        type: line
+        metrics: [batch_duration_ms, row_count]
+        dimensions: [metric_ts, query_name]

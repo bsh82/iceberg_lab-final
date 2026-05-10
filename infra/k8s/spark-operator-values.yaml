@@ -1,0 +1,19 @@
+image:
+  tag: "2.5.0"
+
+spark:
+  jobNamespaces:
+    - criteo-lakehouse
+
+webhook:
+  enable: true
+
+controller:
+  workers: 10
+  env:
+    - name: HOME
+      value: /tmp
+
+prometheus:
+  metrics:
+    enable: true

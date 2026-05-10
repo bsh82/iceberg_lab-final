@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: criteo-producer
+  namespace: criteo-lakehouse
+spec:
+  suspend: true
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: producer
+              image: criteo-producer:local
+              imagePullPolicy: IfNotPresent
+              args:
+                - "--dataset-path"
+                - "/data/criteo_attribution_dataset.tsv.gz"
+                - "--events-per-second"
+                - "200"
+                - "--max-events"
+                - "60000"
+              env:
+                - name: KAFKA_BOOTSTRAP_SERVERS
+                  value: kafka.criteo-lakehouse.svc.cluster.local:9092
+                - name: KAFKA_TOPIC
+                  value: criteo-attribution-events
+              volumeMounts:
+                - name: dataset
+                  mountPath: /data
+          volumes:
+            - name: dataset
+              persistentVolumeClaim:
+                claimName: criteo-dataset
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: criteo-dataset
+  namespace: criteo-lakehouse
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
