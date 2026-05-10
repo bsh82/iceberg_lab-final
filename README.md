@@ -1,4 +1,4 @@
-# 최종 프로젝트: Criteo 광고 어트리뷰션 Lakehouse
+# 최종 프로젝트: Criteo 광고 어트리뷰션 iceberg-Lakehouse
 
 이 프로젝트는 `criteo/criteo-attribution-dataset`을 Kafka로 재생해 실시간 광고 이벤트처럼 만들고, 로컬 Kubernetes 위에서 Kafka, Spark Streaming, Airflow, Trino, Superset을 운영하는 광고 어트리뷰션 Lakehouse 예제입니다. 저장소와 메타데이터는 로컬이 아니라 AWS S3 + Glue Catalog + Apache Iceberg를 사용합니다.
 
