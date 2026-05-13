@@ -5,6 +5,7 @@
 ## 현재 구성
 
 - `diagrams/`: draw.io 아키텍처 구조도
+- `dashboard-snapshots/`: Superset 대시보드에 사용할 Business KPI / Operations 차트 이미지
 
 ## 문서화 기준
 
@@ -15,4 +16,3 @@
 - 왜 Airflow는 데이터 경로가 아니라 control plane인가?
 - 장애가 발생하면 어디에서 복구하는가?
 - 10x/100x 성장 시 어느 계층이 먼저 병목이 되는가?
-

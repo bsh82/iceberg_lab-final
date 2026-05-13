@@ -39,3 +39,7 @@ trino://admin@trino.criteo-lakehouse.svc.cluster.local:8080/iceberg
 Gold 테이블은 dashboard serving을 위해 미리 집계됩니다. Superset이 매번 Silver fact table 전체를 스캔하지 않도록 `campaign_hourly_kpis`, `campaign_daily_kpis`를 사용합니다.
 
 Ops 탭은 운영자가 5분 안에 파이프라인 상태를 확인하는 목적입니다. `ops.health_check_results`와 `ops.streaming_batch_metrics`를 중심으로 구성합니다.
+
+## 이미지 산출물
+
+발표와 README에 바로 넣을 수 있는 대시보드 스냅샷 이미지는 `docs/dashboard-snapshots/`에 저장합니다. 이 이미지는 Superset이 조회하는 Gold/Ops SQL과 같은 Trino 결과를 기반으로 생성합니다.
