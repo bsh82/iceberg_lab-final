@@ -1,11 +1,9 @@
 # docs/diagrams 디렉토리
 
-draw.io 구조도를 보관합니다.
-
 ## 파일
 
-- `current-local-architecture.drawio`: 현재 로컬 Kubernetes compute + AWS S3/Glue/Iceberg 구조
-- `cloud-migration-architecture.drawio`: AWS 완전 마이그레이션 구조
+- `current-local-architecture`: 현재 로컬 Kubernetes compute + AWS S3/Glue/Iceberg 구조
+- `cloud-migration-architecture`: AWS 완전 마이그레이션 구조
 
 ## 그림 해석 기준
 
