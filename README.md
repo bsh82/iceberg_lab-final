@@ -254,6 +254,13 @@ Superset -> Trino -> Glue Catalog -> Iceberg table metadata -> S3 data files
 ```text
 dashboard/
 ├── README.md
+├── snapshots/
+│   ├── business_top_campaign_spend.png
+│   ├── business_hourly_funnel.png
+│   ├── business_conversion_efficiency.png
+│   ├── operations_health_latest.png
+│   ├── operations_streaming_batches.png
+│   └── data/
 ├── sql/
 │   ├── business_campaign_daily.sql
 │   ├── business_campaign_hourly.sql
@@ -520,6 +527,7 @@ kubectl -n criteo-lakehouse port-forward svc/trino 8081:8080
 │   ├── dags/
 │   └── spark-applications/
 ├── dashboard/
+│   ├── snapshots/
 │   ├── sql/
 │   └── superset_dashboard_spec.yaml
 └── scripts/

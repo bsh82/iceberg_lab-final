@@ -5,7 +5,8 @@
 ## 현재 구성
 
 - `diagrams/`: draw.io 아키텍처 구조도
-- `dashboard-snapshots/`: Superset 대시보드에 사용할 Business KPI / Operations 차트 이미지
+
+대시보드 스냅샷과 차트 근거 CSV는 BI 산출물 성격이 강하므로 `dashboard/snapshots/`에서 관리합니다.
 
 ## 문서화 기준
 
