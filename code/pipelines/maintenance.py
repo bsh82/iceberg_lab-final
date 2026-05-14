@@ -26,6 +26,20 @@ def compact_table(spark, cfg, table: str, target_file_size_bytes: int) -> None:
     ).show(truncate=False)
 
 
+def compact_position_delete_files(spark, cfg, table: str, target_file_size_bytes: int) -> None:
+    spark.sql(
+        f"""
+        CALL {cfg.catalog}.system.rewrite_position_delete_files(
+          table => '{table}',
+          options => map(
+            'target-file-size-bytes', '{target_file_size_bytes}',
+            'rewrite-all', 'true'
+          )
+        )
+        """
+    ).show(truncate=False)
+
+
 def expire_snapshots(spark, cfg, table: str, retention_days: int, retain_last: int) -> None:
     spark.sql(
         f"""
@@ -53,7 +67,7 @@ def remove_orphans(spark, cfg, table: str, retention_days: int, dry_run: bool) -
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Iceberg table maintenance.")
-    parser.add_argument("--action", choices=["compact", "expire", "orphan", "all"], default="all")
+    parser.add_argument("--action", choices=["compact", "delete-files", "expire", "orphan", "all"], default="all")
     parser.add_argument("--tables", nargs="*", default=None)
     parser.add_argument("--target-file-size-bytes", type=int, default=134217728)
     parser.add_argument("--snapshot-retention-days", type=int, default=7)
@@ -69,6 +83,8 @@ def main() -> None:
     for table in tables:
         if args.action in ("compact", "all"):
             compact_table(spark, cfg, table, args.target_file_size_bytes)
+        if args.action in ("delete-files", "all"):
+            compact_position_delete_files(spark, cfg, table, args.target_file_size_bytes)
         if args.action in ("expire", "all"):
             expire_snapshots(spark, cfg, table, args.snapshot_retention_days, args.snapshot_retain_last)
         if args.action in ("orphan", "all"):

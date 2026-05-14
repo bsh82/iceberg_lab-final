@@ -10,6 +10,9 @@ USING iceberg
 PARTITIONED BY (days(run_ts), severity)
 TBLPROPERTIES (
   'format-version' = '2',
+  'write.merge.mode' = 'merge-on-read',
+  'write.update.mode' = 'merge-on-read',
+  'write.delete.mode' = 'merge-on-read',
   'write.target-file-size-bytes' = '67108864',
   'write.parquet.compression-codec' = 'zstd'
 );

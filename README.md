@@ -176,11 +176,11 @@ Gold는 BI와 운영자가 보는 안정된 serving layer입니다. Backfill 이
 
 1. 중복 제거/재처리
 
-   Spark Streaming 장애 후 재시작하면 같은 Kafka offset 또는 raw 파일을 다시 처리할 수 있습니다. Parquet append만 있으면 중복 제거를 애플리케이션 레벨에서 어렵게 해결해야 합니다. Iceberg Silver는 `MERGE INTO ... ON event_id`로 멱등성을 가집니다.
+   Spark Streaming 장애 후 재시작하면 같은 Kafka offset 또는 raw 파일을 다시 처리할 수 있습니다. Parquet append만 있으면 중복 제거를 애플리케이션 레벨에서 어렵게 해결해야 합니다. Iceberg Silver는 `MERGE INTO ... ON event_id`로 멱등성을 가지며, 현재 테이블은 Merge-on-Read mode로 설정해 MERGE 시 영향을 받은 파일 전체를 즉시 다시 쓰는 비용을 줄입니다.
 
 2. 백필
 
-   광고 어트리뷰션 로직은 나중에 바뀌기 쉽습니다. 예를 들어 attribution window, conversion 인정 조건, bot traffic 제외 조건이 바뀔 수 있습니다. Iceberg는 snapshot isolation과 MERGE를 제공하므로 백필 중에도 대시보드가 일관된 snapshot을 읽을 수 있습니다.
+   광고 어트리뷰션 로직은 나중에 바뀌기 쉽습니다. 예를 들어 attribution window, conversion 인정 조건, bot traffic 제외 조건이 바뀔 수 있습니다. Iceberg는 snapshot isolation과 MERGE를 제공하므로 백필 중에도 대시보드가 일관된 snapshot을 읽을 수 있습니다. Merge-on-Read는 백필 결과를 delete file과 신규 data file 중심으로 반영해 write amplification을 낮추는 대신, 이후 compaction에서 delete file을 정리해야 합니다.
 
 3. 운영 가시성
 
@@ -188,7 +188,7 @@ Gold는 BI와 운영자가 보는 안정된 serving layer입니다. Backfill 이
 
 4. Maintenance 자동화
 
-   Streaming은 작은 파일을 많이 만듭니다. Iceberg의 `rewrite_data_files`, `expire_snapshots`, `remove_orphan_files` procedure를 Airflow에서 주기적으로 실행할 수 있습니다.
+   Streaming은 작은 파일을 많이 만듭니다. 또한 Merge-on-Read MERGE는 position delete file을 만들 수 있습니다. Iceberg의 `rewrite_data_files`, `rewrite_position_delete_files`, `expire_snapshots`, `remove_orphan_files` procedure를 Airflow에서 주기적으로 실행할 수 있습니다.
 
 5. 동시성 제어
 
@@ -215,6 +215,8 @@ code/health-queries/
 | `07_manifest_count.sql` | manifest 증가 감지 | Iceberg `manifests` |
 | `08_duplicate_event_id.sql` | event_id 중복 탐지 | Silver data |
 | `09_streaming_batch_duration.sql` | micro-batch duration 확인 | Ops metrics |
+| `10_silver_delete_file_count.sql` | Silver MOR delete file 누적 확인 | Iceberg `files` |
+| `11_gold_delete_file_count.sql` | Gold MOR delete file 누적 확인 | Iceberg `files` |
 
 Airflow DAG:
 
@@ -304,7 +306,7 @@ Operations 탭:
 | Kafka | 단일 broker 한계 | broker disk/network 병목 | MSK 또는 Strimzi 다중 broker, topic partition 48~192 |
 | Producer | 단일 pod 처리량 한계 | replay/ingest 병렬성 부족 | producer partition key를 event_id/campaign 기준으로 분산 |
 | Bronze streaming | trigger당 처리량 부족 | checkpoint/listing 비용 증가 | maxOffsetsPerTrigger 조정, executor dynamic allocation, Bronze prefix 일/hour 분리 |
-| Silver MERGE | event_id MERGE 비용 증가 | 작은 파일과 manifest 증가 | micro-batch 크기 확대, equality delete/merge tuning, compaction 주기 강화 |
+| Silver MERGE | event_id MERGE 비용 증가 | 작은 파일, delete file, manifest 증가 | micro-batch 크기 확대, MOR delete file compaction, equality delete/merge tuning, compaction 주기 강화 |
 | Gold batch | daily 재집계 시간 증가 | campaign skew | incremental aggregation, campaign bucket, high-spend campaign 별도 처리 |
 | Glue Catalog | table version 증가 | metadata API throttle | snapshot expiration, metadata previous versions 제한, catalog API retry |
 | S3 | PUT/list 비용 증가 | small file 비용 폭증 | target file size 128~512MB, compaction window 분리 |
@@ -316,7 +318,7 @@ Operations 탭:
 - Spark: EMR on EKS, node group 분리
 - Bronze writer: at-least-once + checkpoint 유지
 - Silver writer: campaign bucket + event date partition 유지
-- Compaction: 낮은 트래픽 시간대, partition 단위, partial progress
+- Compaction: 낮은 트래픽 시간대, partition 단위, partial progress, position delete file compaction
 - Gold: hourly incremental MERGE 후 daily는 hourly에서 재집계
 - BI: Trino coordinator/worker 분리, Superset cache 활성화
 - 운영: Iceberg metadata query + Prometheus/Spark metrics + Kafka lag dashboard
@@ -354,12 +356,13 @@ criteo_backfill_and_gold_rebuild
 위험:
 
 - compaction은 기존 data file을 더 큰 파일로 rewrite한다.
-- streaming MERGE도 같은 파티션에 새 data/delete file을 commit할 수 있다.
+- Merge-on-Read streaming MERGE도 같은 파티션에 신규 data file과 position delete file을 commit할 수 있다.
 - Iceberg는 optimistic concurrency control로 commit 충돌을 감지한다.
 
 운영 패턴:
 
 - compaction은 새벽 또는 low-traffic window에 실행한다.
+- MOR에서 누적되는 position delete file은 `rewrite_position_delete_files`로 정리한다.
 - `partial-progress.enabled=true`로 일부 partition만 성공해도 진전되게 한다.
 - streaming job은 checkpoint 기반으로 재시도 가능하게 둔다.
 - 충돌이 잦은 campaign/date partition은 compaction 대상에서 일시 제외한다.
@@ -569,4 +572,3 @@ kubectl -n criteo-lakehouse port-forward svc/trino 8081:8080
 4. Kafka endpoint를 MSK bootstrap server로 교체한다.
 5. Trino는 Amazon Athena 또는 EKS Trino로 대체 가능하다.
 6. Superset datasource URI만 바꾼다.
-

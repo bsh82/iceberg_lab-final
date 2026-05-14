@@ -16,6 +16,9 @@ USING iceberg
 PARTITIONED BY (event_date, bucket(32, campaign_id))
 TBLPROPERTIES (
   'format-version' = '2',
+  'write.merge.mode' = 'merge-on-read',
+  'write.update.mode' = 'merge-on-read',
+  'write.delete.mode' = 'merge-on-read',
   'write.distribution-mode' = 'hash',
   'write.target-file-size-bytes' = '134217728',
   'write.parquet.compression-codec' = 'zstd',

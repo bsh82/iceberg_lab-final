@@ -1,3 +1,8 @@
+WITH data_files AS (
+  SELECT file_size_in_bytes
+  FROM ${catalog}.${silver_db}.events.files
+  WHERE CAST(content AS STRING) IN ('0', 'DATA')
+)
 SELECT
   'silver_small_file_ratio' AS metric_name,
   CAST(COALESCE(sum(CASE WHEN file_size_in_bytes < 32 * 1024 * 1024 THEN 1 ELSE 0 END) / count(*), 0.0) AS DOUBLE) AS metric_value,
@@ -12,4 +17,4 @@ SELECT
     ', total_files=',
     count(*)
   ) AS details
-FROM ${catalog}.${silver_db}.events.files;
+FROM data_files;
